@@ -1,0 +1,20 @@
+[package]
+name = "silica-linux"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dirs = "7.0.0"
+fancy-regex = "0.20.2"
+gpui = "0.2.2"
+ignore = "0.4.34"
+image = { version = "0.25", default-features = false }
+notify = "8.2.2"
+parking_lot = "0.12.5"
+regex = "1.13.1"
+ropey = { version = "1.6.1", default-features = false, features = ["cr_lines", "simd"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+smallvec = "1.16.5"
+trash = "5.3.0"
+unicode-segmentation = "1.13.3"
