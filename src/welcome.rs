@@ -10,7 +10,7 @@ use gpui::{
 use crate::app;
 use crate::project::recent::{self, RecentProject};
 use crate::theme::{self, alpha};
-use crate::ui::chrome::{self, TrafficLightActions};
+use crate::ui::chrome;
 use crate::ui::menu::{ContextMenu, MenuItem};
 use crate::ui::{icon_view, push_button, unavailable};
 
@@ -76,11 +76,6 @@ impl Render for Welcome {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = theme::colors(cx);
         let last = self.projects.first().cloned();
-        let traffic = chrome::traffic_lights(
-            window,
-            cx,
-            TrafficLightActions { close: Box::new(|window, _| window.remove_window()) },
-        );
 
         let hero = div()
             .w(px(330.))
@@ -262,7 +257,6 @@ impl Render for Welcome {
             .child(hero)
             .child(recents)
             .child(chrome::drag_area(div().id("welcome-title").absolute().top_0().left_0().w(px(330.)).h(px(36.))))
-            .child(div().absolute().top(px(12.)).left(px(16.)).child(traffic))
             .drag_over::<ExternalPaths>(move |style, _, _, _| style.border_2().border_color(colors.accent).rounded(px(16.)))
             .on_drop(|paths: &ExternalPaths, _, cx| {
                 // A folder opens as a project; a file in the project it belongs to.

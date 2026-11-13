@@ -6,26 +6,25 @@ use gpui::{
     StatefulInteractiveElement, Styled, StyledImage, Window, div, img, prelude::FluentBuilder, px,
 };
 
-use super::{CARD_INSET, CARD_RADIUS, GoToLine, TITLE_BAR_HEIGHT, TRAFFIC_LIGHTS_WIDTH, Workspace};
+use super::{CARD_INSET, CARD_RADIUS, GoToLine, TITLE_BAR_HEIGHT, Workspace};
 use crate::buffer::{Content, format_bytes};
 use crate::editor::MINIMAP_WIDTH;
 use crate::preview::PreviewFormat;
 use crate::settings::Settings;
 use crate::theme::{self, alpha};
-use crate::ui::chrome::{self, TrafficLightActions};
+use crate::ui::chrome;
 use crate::ui::{capsule, icon_view, push_button, title_bar_button, unavailable};
 
 impl Workspace {
     pub(super) fn render_editor_area(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = theme::colors(cx);
         let sidebar_visible = self.sidebar_visible;
-        let this = cx.entity().downgrade();
         let preview = self
             .active_buffer()
             .filter(|b| b.editor().is_some())
             .and_then(|b| b.preview_format.map(|f| (f, b.showing_preview)));
 
-        // Title bar row: tabs share it with the traffic lights.
+        // Title bar row: the tabs, after the sidebar button when the sidebar is hidden.
         let title_row = chrome::drag_area(
             div()
                 .id("editor-title")
@@ -35,22 +34,7 @@ impl Workspace {
                 .items_center()
                 .gap(px(8.))
                 .when(!sidebar_visible, |d| {
-                    d.child(
-                        div()
-                            .pl(px(16.))
-                            .w(px(TRAFFIC_LIGHTS_WIDTH))
-                            .flex_none()
-                            .child(chrome::traffic_lights(
-                                window,
-                                cx,
-                                TrafficLightActions {
-                                    close: Box::new(move |window, cx| {
-                                        this.update(cx, |this, cx| this.close_window(window, cx)).ok();
-                                    }),
-                                },
-                            )),
-                    )
-                    .child(title_bar_button("show-sidebar", "panel-left", colors.secondary, cx, |_, window, cx| {
+                    d.pl(px(12.)).child(title_bar_button("show-sidebar", "panel-left", colors.secondary, cx, |_, window, cx| {
                         window.dispatch_action(Box::new(super::ToggleSidebar), cx)
                     }))
                 })

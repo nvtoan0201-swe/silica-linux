@@ -72,10 +72,8 @@ actions!(
     ]
 );
 
-/// Height of the title bar row that holds the traffic lights and the tabs.
+/// Height of the title bar row that holds the sidebar header and the tabs.
 pub const TITLE_BAR_HEIGHT: f32 = 36.;
-/// Room for the traffic lights when the sidebar is hidden.
-pub const TRAFFIC_LIGHTS_WIDTH: f32 = 78.;
 pub const CARD_RADIUS: f32 = 10.;
 pub const CARD_INSET: f32 = 6.;
 
