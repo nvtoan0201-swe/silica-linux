@@ -1323,9 +1323,18 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::bench::time("workspace render", || self.render_workspace(window, cx))
+    }
+}
+
+impl Workspace {
+    fn render_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
         let colors = theme::colors(cx);
         let settings = Settings::get(cx).clone();
         window.set_window_title(&self.name());
+        if std::env::var_os("SILICA_BENCH").is_some() {
+            bench_frame(self, window, cx);
+        }
         let sidebar_width = settings.sidebar_width.clamp(Settings::SIDEBAR_WIDTH_RANGE.0, Settings::SIDEBAR_WIDTH_RANGE.1);
 
         let content = div()
@@ -1378,7 +1387,7 @@ impl Render for Workspace {
             }))
             .on_mouse_up(gpui::MouseButton::Left, cx.listener(|this, _, _, _| this.sidebar_drag = None));
         let content = self.register_actions(content, cx);
-        chrome::frame(window, cx, content.into_any_element())
+        chrome::frame(window, cx, content.into_any_element()).into_any_element()
     }
 }
 
@@ -1427,3 +1436,35 @@ pub fn bind_keys(cx: &mut App) {
 
 pub type WeakWorkspace = WeakEntity<Workspace>;
 pub type Element = AnyElement;
+
+/// With SILICA_BENCH set: scrolls the active editor every frame and prints the frame rate.
+fn bench_frame(workspace: &mut Workspace, window: &mut Window, cx: &mut Context<Workspace>) {
+    use std::cell::RefCell;
+    use std::time::Instant;
+    thread_local! {
+        static STATS: RefCell<(Option<Instant>, Instant, Vec<f32>)> = RefCell::new((None, Instant::now(), Vec::new()));
+    }
+    STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        let now = Instant::now();
+        if let Some(last) = stats.0 {
+            let ms = now.duration_since(last).as_secs_f32() * 1000.;
+            stats.2.push(ms);
+        }
+        stats.0 = Some(now);
+        if now.duration_since(stats.1).as_secs_f32() >= 2. && !stats.2.is_empty() {
+            let frames = &stats.2;
+            let avg = frames.iter().sum::<f32>() / frames.len() as f32;
+            let max = frames.iter().cloned().fold(0., f32::max);
+            let slow = frames.iter().filter(|f| **f > 9.).count();
+            crate::bench::report();
+            eprintln!("fps {:.1}  avg {:.2}ms  max {:.2}ms  >9ms: {}/{}", 1000. / avg, avg, max, slow, frames.len());
+            stats.2.clear();
+            stats.1 = now;
+        }
+    });
+    if let Some(editor) = workspace.active_editor() {
+        editor.update(cx, |e, cx| e.bench_scroll(6., cx));
+    }
+    window.request_animation_frame();
+}

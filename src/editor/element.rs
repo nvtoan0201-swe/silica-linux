@@ -155,8 +155,8 @@ impl Element for EditorElement {
         let settings = Settings::get(cx).clone();
         let colors = theme::colors(cx);
         let focused = self.editor.read(cx).focus_handle.is_focused(window);
-        let (snapshot, paint) = self.editor.update(cx, |editor, cx| {
-            editor.layout_rows(bounds, &settings, colors, focused, window, cx)
+        let (snapshot, paint) = crate::bench::time("editor layout", || {
+            self.editor.update(cx, |editor, cx| editor.layout_rows(bounds, &settings, colors, focused, window, cx))
         });
         let snapshot = Rc::new(snapshot);
         let text_hitbox = window.insert_hitbox(snapshot.text_bounds, HitboxBehavior::Normal);
@@ -187,7 +187,7 @@ impl Element for EditorElement {
         let line_height = px(snapshot.metrics.line_height);
         let paint = std::mem::take(&mut prepaint.paint);
 
-        window.with_content_mask(Some(ContentMask { bounds }), |window| {
+        crate::bench::time("editor paint", || window.with_content_mask(Some(ContentMask { bounds }), |window| {
             // Text scrolled sideways disappears under the gutter.
             window.with_content_mask(Some(ContentMask { bounds: snapshot.text_bounds }), |window| {
                 for (rect, color) in &paint.backgrounds {
@@ -209,7 +209,7 @@ impl Element for EditorElement {
             for (rect, color) in &paint.minimap {
                 window.paint_quad(fill(*rect, *color));
             }
-        });
+        }));
     }
 }
 

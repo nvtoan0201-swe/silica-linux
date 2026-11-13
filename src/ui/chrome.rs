@@ -1,10 +1,10 @@
 //! The window frame Silica draws itself: rounded corners with a shadow, the frosted
-//! background, resizing from the edges and the macOS-style traffic lights.
+//! background and resizing from the edges.
 
 use gpui::{
     AnyElement, App, Bounds, CursorStyle, Decorations, HitboxBehavior, InteractiveElement,
     IntoElement, MouseButton, ParentElement, Pixels, Point, ResizeEdge, Size, Styled, Window,
-    canvas, div, linear_color_stop, linear_gradient, point, prelude::FluentBuilder, px,
+    canvas, div, size, linear_color_stop, linear_gradient, point, prelude::FluentBuilder, px,
 };
 
 use crate::settings::Settings;
@@ -41,26 +41,30 @@ pub fn frame(window: &mut Window, cx: &App, content: AnyElement) -> impl IntoEle
                 .size_full()
                 .bg(gpui::transparent_black())
                 .child(
+                    // One hitbox per edge and corner, each with its own resize cursor, so the
+                    // cursor changes without redrawing the window on every mouse move.
                     canvas(
-                        |_bounds, window, _| {
-                            window.insert_hitbox(
-                                Bounds::new(point(px(0.), px(0.)), window.window_bounds().get_bounds().size),
-                                HitboxBehavior::Normal,
-                            )
+                        |bounds, window, _| {
+                            let edge = px(SHADOW);
+                            let corner = px(SHADOW * 2.);
+                            let (x, y) = (bounds.origin.x, bounds.origin.y);
+                            let (w, h) = (bounds.size.width, bounds.size.height);
+                            let rects = [
+                                (CursorStyle::ResizeUpLeftDownRight, Bounds::new(point(x, y), size(corner, corner))),
+                                (CursorStyle::ResizeUpRightDownLeft, Bounds::new(point(x + w - corner, y), size(corner, corner))),
+                                (CursorStyle::ResizeUpRightDownLeft, Bounds::new(point(x, y + h - corner), size(corner, corner))),
+                                (CursorStyle::ResizeUpLeftDownRight, Bounds::new(point(x + w - corner, y + h - corner), size(corner, corner))),
+                                (CursorStyle::ResizeUpDown, Bounds::new(point(x, y), size(w, edge))),
+                                (CursorStyle::ResizeUpDown, Bounds::new(point(x, y + h - edge), size(w, edge))),
+                                (CursorStyle::ResizeLeftRight, Bounds::new(point(x, y), size(edge, h))),
+                                (CursorStyle::ResizeLeftRight, Bounds::new(point(x + w - edge, y), size(edge, h))),
+                            ];
+                            rects.map(|(style, rect)| (style, window.insert_hitbox(rect, HitboxBehavior::Normal)))
                         },
-                        move |_bounds, hitbox, window, _| {
-                            let mouse = window.mouse_position();
-                            let size = window.window_bounds().get_bounds().size;
-                            let Some(edge) = resize_edge(mouse, px(SHADOW), size) else { return };
-                            window.set_cursor_style(
-                                match edge {
-                                    ResizeEdge::Top | ResizeEdge::Bottom => CursorStyle::ResizeUpDown,
-                                    ResizeEdge::Left | ResizeEdge::Right => CursorStyle::ResizeLeftRight,
-                                    ResizeEdge::TopLeft | ResizeEdge::BottomRight => CursorStyle::ResizeUpLeftDownRight,
-                                    ResizeEdge::TopRight | ResizeEdge::BottomLeft => CursorStyle::ResizeUpRightDownLeft,
-                                },
-                                &hitbox,
-                            );
+                        |_, hitboxes, window, _| {
+                            for (style, hitbox) in &hitboxes {
+                                window.set_cursor_style(*style, hitbox);
+                            }
                         },
                     )
                     .size_full()
@@ -70,7 +74,6 @@ pub fn frame(window: &mut Window, cx: &App, content: AnyElement) -> impl IntoEle
                 .when(!tiling.bottom, |d| d.pb(px(inset)))
                 .when(!tiling.left, |d| d.pl(px(inset)))
                 .when(!tiling.right, |d| d.pr(px(inset)))
-                .on_mouse_move(|_, window, _| window.refresh())
                 .on_mouse_down(MouseButton::Left, move |e, window, _| {
                     let size = window.window_bounds().get_bounds().size;
                     if let Some(edge) = resize_edge(e.position, px(SHADOW), size) {

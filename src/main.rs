@@ -1,5 +1,6 @@
 mod app;
 mod assets;
+mod bench;
 mod buffer;
 mod desktop;
 mod editor;
@@ -22,6 +23,7 @@ use gpui::{App, Application};
 use settings::Settings;
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
     let paths: Vec<PathBuf> = std::env::args().skip(1).filter(|a| !a.starts_with('-')).map(PathBuf::from).collect();
     Application::new().with_assets(assets::Assets).run(move |cx: &mut App| {
         cx.set_global(Settings::load());

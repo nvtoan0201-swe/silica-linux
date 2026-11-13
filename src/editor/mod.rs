@@ -406,6 +406,16 @@ impl Editor {
         cx.notify();
     }
 
+    /// Scrolls by `dy` pixels, going back to the top past the end (for measuring frame rates).
+    pub fn bench_scroll(&mut self, dy: f32, cx: &mut Context<Self>) {
+        let max = self.layout.as_ref().map_or(0., |l| l.max_scroll.1);
+        self.scroll.y += dy;
+        if self.scroll.y > max {
+            self.scroll.y = 0.;
+        }
+        cx.notify();
+    }
+
     /// The 1-based line shown at the top of the editor.
     pub fn top_visible_line(&mut self) -> usize {
         let Some(layout) = self.layout.clone() else { return 1 };
