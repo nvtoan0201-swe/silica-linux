@@ -160,6 +160,9 @@ impl Workspace {
                     .child(if search_mode { "Search".to_string() } else { self.name() }),
             )
             .child(div().w(px(8.)))
+            .child(title_bar_button("settings", "settings", colors.secondary, cx, |_, window, cx| {
+                window.dispatch_action(Box::new(crate::app::ShowSettings), cx)
+            }))
             .when(!search_mode, |d| {
                 d.child(title_bar_button("collapse", "fold-vertical", colors.secondary, cx, |_, window, cx| {
                     window.dispatch_action(Box::new(CollapseFolders), cx)

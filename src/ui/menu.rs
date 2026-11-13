@@ -15,17 +15,26 @@ actions!(menu, [Dismiss, SelectNext, SelectPrevious, Confirm]);
 type Handler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 pub enum MenuItem {
-    Action { label: SharedString, enabled: bool, handler: Handler },
+    Action { label: SharedString, enabled: bool, checked: bool, handler: Handler },
     Separator,
 }
 
 impl MenuItem {
     pub fn new(label: impl Into<SharedString>, handler: impl Fn(&mut Window, &mut App) + 'static) -> MenuItem {
-        MenuItem::Action { label: label.into(), enabled: true, handler: Rc::new(handler) }
+        MenuItem::Action { label: label.into(), enabled: true, checked: false, handler: Rc::new(handler) }
+    }
+
+    /// An item with a checkmark when it's the current choice.
+    pub fn check(
+        label: impl Into<SharedString>,
+        checked: bool,
+        handler: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> MenuItem {
+        MenuItem::Action { label: label.into(), enabled: true, checked, handler: Rc::new(handler) }
     }
 
     pub fn disabled(label: impl Into<SharedString>) -> MenuItem {
-        MenuItem::Action { label: label.into(), enabled: false, handler: Rc::new(|_, _| {}) }
+        MenuItem::Action { label: label.into(), enabled: false, checked: false, handler: Rc::new(|_, _| {}) }
     }
 }
 
@@ -99,6 +108,8 @@ impl Render for ContextMenu {
             }))
             .on_mouse_down_out(cx.listener(|_, _, _, cx| cx.emit(DismissEvent)))
             .min_w(px(200.))
+            .max_h(px(380.))
+            .overflow_y_scroll()
             .p(px(5.))
             .flex()
             .flex_col()
@@ -120,8 +131,10 @@ impl Render for ContextMenu {
                     .h(px(1.))
                     .bg(colors.separator)
                     .into_any_element(),
-                MenuItem::Action { label, enabled, .. } => {
+                MenuItem::Action { label, enabled, checked, .. } => {
                     let enabled = *enabled;
+                    let checked = *checked;
+                    let any_checked = self.items.iter().any(|i| matches!(i, MenuItem::Action { checked: true, .. }));
                     div()
                         .id(index)
                         .px(px(9.))
@@ -132,6 +145,15 @@ impl Render for ContextMenu {
                         .text_color(if enabled { colors.label } else { colors.tertiary })
                         .when(enabled && highlighted == Some(index), |d| d.bg(colors.accent).text_color(gpui::white()))
                         .when(enabled, |d| d.hover(|s| s.bg(colors.accent).text_color(gpui::white())))
+                        .gap(px(6.))
+                        .when(any_checked, |d| {
+                            d.child(
+                                div()
+                                    .w(px(12.))
+                                    .flex_none()
+                                    .when(checked, |d| d.child(crate::ui::icon_view("check", 12., colors.accent))),
+                            )
+                        })
                         .child(label.clone())
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(cx.listener(move |this, _, window, cx| this.run(index, window, cx)))

@@ -34,7 +34,9 @@ fn main() {
         workspace::quick_open::bind_keys(cx);
         app::bind_keys(cx);
         app::watch_windows(cx);
-        if paths.is_empty() {
+        if std::env::args().any(|a| a == "--settings") {
+            settings_window::show(cx);
+        } else if paths.is_empty() {
             app::show_welcome(cx);
         } else {
             app::open_paths(&paths, cx);
