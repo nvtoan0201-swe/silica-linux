@@ -1,71 +1,94 @@
 # Silica
 
-A lightweight, native code editor for Linux, written in Rust on top of [GPUI](https://www.gpui.rs/) — the GPU-accelerated UI framework behind Zed.
+A lightweight native code editor for Linux, built with Rust and [GPUI](https://www.gpui.rs/).
 
-No Electron, no web view, no language-server zoo: one small binary that opens instantly, renders every frame on the GPU, and stays out of your way.
-
-![Silica on Linux](docs/screenshot.png)
+![Silica](docs/screenshot.png)
 
 ## Features
 
-- **Native and fast** — GPUI draws the whole UI on the GPU, on both Wayland and X11. Text lives in a rope (`ropey`), so large files stay responsive.
-- **Editor** — syntax highlighting, line-number gutter, indent guides, word wrap, minimap, undo/redo, move/duplicate lines, toggle comments, indent/outdent, go to line.
-- **Workspace** — file explorer with create/rename/move-to-trash, tabs, and a live file watcher that keeps the tree in sync with the disk.
-- **Quick Open** — fuzzy file finder that respects `.gitignore`.
-- **Find in project** — regex search across the whole folder.
-- **Previews** — Markdown, CSV and HTML files can switch between source and a rendered view.
-- **Sessions** — reopens your last folders and tabs; recent projects on the welcome screen.
-- **Settings window** — font, size, theme and editor options, stored as plain JSON in `~/.config/silica/settings.json`.
+- GPU-rendered UI on Wayland and X11
+- Syntax highlighting with 9 color themes
+- Line numbers, indent guides, word wrap and minimap
+- File explorer with live reload when files change on disk
+- Quick Open (fuzzy file search, respects `.gitignore`)
+- Regex search across the project
+- Rendered preview for Markdown, CSV and HTML
+- Restores open folders and tabs between sessions
+- Follows the system light/dark mode and fonts
 
-Syntax highlighting covers Rust, C/C++, Go, Python, JavaScript/TypeScript, Java, Kotlin, C#, Swift, Objective-C, Ruby, PHP, Shell, SQL, HTML, XML, CSS, JSON, YAML, TOML, Markdown, Dockerfile, Makefile and diffs.
+Supported languages: C, C++, C#, CSS, Diff, Dockerfile, Go, HTML, Java, JavaScript, JSON, Kotlin, Makefile, Markdown, Objective-C, PHP, Python, Ruby, Rust, Shell, SQL, Swift, TOML, TypeScript, XML, YAML.
 
-## Build
+## Requirements
 
-You need a recent stable Rust toolchain (edition 2024) and the usual GPUI system libraries. On Debian/Ubuntu:
+- Rust 1.85 or newer
+- A GPU with Vulkan support
+- Build dependencies (Debian/Ubuntu):
 
-```sh
-sudo apt install build-essential pkg-config libxkbcommon-dev libxkbcommon-x11-dev \
-  libwayland-dev libvulkan-dev libfontconfig-dev libssl-dev libzstd-dev
-```
+  ```sh
+  sudo apt install build-essential pkg-config libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev
+  ```
 
-Then:
+## Installation
 
 ```sh
 git clone https://github.com/nvtoan0201-swe/silica-linux.git
 cd silica-linux
-cargo run --release              # welcome screen
-cargo run --release -- ~/code/my-project   # open a folder (or files)
+cargo install --path .
+```
+
+This installs the `silica-linux` binary to `~/.cargo/bin`.
+
+## Usage
+
+```sh
+silica-linux                    # open the welcome screen
+silica-linux path/to/project    # open a folder
+silica-linux file.rs other.rs   # open files
 ```
 
 ## Keyboard shortcuts
 
 | Action | Shortcut |
 | --- | --- |
+| Open | `Ctrl+O` |
+| New file | `Ctrl+N` |
+| Save / Save all | `Ctrl+S` / `Ctrl+Alt+S` |
+| Close tab | `Ctrl+W` |
 | Quick Open | `Ctrl+P` |
 | Find in project | `Ctrl+Shift+F` |
 | Go to line | `Ctrl+G` |
-| Toggle sidebar | `Ctrl+B` |
-| Toggle preview | `Ctrl+Shift+V` |
+| Toggle comment | `Ctrl+/` |
 | Move line up / down | `Alt+↑` / `Alt+↓` |
 | Duplicate line up / down | `Alt+Shift+↑` / `Alt+Shift+↓` |
 | Toggle word wrap | `Alt+Z` |
+| Toggle preview | `Ctrl+Shift+V` |
+| Toggle sidebar | `Ctrl+B` |
 | Next / previous tab | `Ctrl+PgDn` / `Ctrl+PgUp` |
-| Save all | `Ctrl+Alt+S` |
 | Zoom in / out / reset | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` |
 | Settings | `Ctrl+,` |
 
-## Project layout
+## Configuration
 
+Open the settings window with `Ctrl+,`. Settings are stored in `~/.config/silica/settings.json`:
+
+```json
+{
+  "fontSize": 13.0,
+  "fontFamily": "JetBrains Mono",
+  "tabWidth": 4,
+  "indentsWithTabs": false,
+  "wrapsLines": true,
+  "showsLineNumbers": true,
+  "showsIndentGuides": true,
+  "showsMinimap": false,
+  "syntaxTheme": "one",
+  "appearance": "system",
+  "restoresTabs": true
+}
 ```
-src/
-  editor/     text view, input, wrapping, undo history
-  syntax/     languages, grammars, highlight theme
-  workspace/  project window, tabs, explorer, Quick Open
-  project/    file tree, index, fuzzy matching, watcher, sessions
-  preview/    Markdown / CSV / HTML rendering
-  ui/         shared widgets: window chrome, menus, text fields, icons
-```
 
-## Status
-
-Early and evolving — Silica started as a macOS editor and this is its Rust/GPUI port for Linux. Bug reports and pull requests are welcome.
+| Key | Values |
+| --- | --- |
+| `syntaxTheme` | `one`, `github`, `xcode`, `solarized`, `catppuccin`, `gruvbox`, `tokyoNight`, `rosePine`, `dracula` |
+| `appearance` | `system`, `light`, `dark` |
+| `tabWidth` | `2`, `4`, `8` |
