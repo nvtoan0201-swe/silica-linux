@@ -17,7 +17,7 @@ use super::{
 use crate::project::index;
 use crate::settings::Settings;
 use crate::theme::{self, alpha};
-use crate::ui::chrome;
+use crate::ui::chrome::{self, TrafficLightActions};
 use crate::ui::menu::MenuItem;
 use crate::ui::{capsule, file_icon, icon_view, title_bar_button};
 
@@ -142,6 +142,16 @@ impl Workspace {
 
     pub(super) fn render_sidebar(&mut self, width: f32, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = theme::colors(cx);
+        let this = cx.entity().downgrade();
+        let traffic = chrome::traffic_lights(
+            window,
+            cx,
+            TrafficLightActions {
+                close: Box::new(move |window, cx| {
+                    this.update(cx, |this, cx| this.close_window(window, cx)).ok();
+                }),
+            },
+        );
         let search_mode = self.sidebar_mode == SidebarMode::Search;
         let header = div()
             .flex()
@@ -194,6 +204,7 @@ impl Workspace {
                 .items_center()
                 .pl(px(16.))
                 .pr(px(4.))
+                .child(div().w(px(super::TRAFFIC_LIGHTS_WIDTH - 16.)).flex_none().child(traffic))
                 .child(header),
         );
 

@@ -3,12 +3,13 @@
 
 use gpui::{
     AnyElement, App, Bounds, CursorStyle, Decorations, HitboxBehavior, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Pixels, Point, ResizeEdge, Size, Styled, Window,
+    IntoElement, MouseButton, ParentElement, Pixels, Point, ResizeEdge, Size, StatefulInteractiveElement, Styled, Window,
     canvas, div, size, linear_color_stop, linear_gradient, point, prelude::FluentBuilder, px,
 };
 
 use crate::settings::Settings;
 use crate::theme::{self, alpha};
+use crate::ui::icon_view;
 
 /// The window's corner radius; the editor card's outer corners are concentric with it.
 pub const WINDOW_RADIUS: f32 = 16.;
@@ -149,4 +150,48 @@ pub fn drag_area<E: InteractiveElement>(element: E) -> E {
         .on_mouse_down(MouseButton::Right, |event, window, _| {
             window.show_window_menu(event.position);
         })
+}
+
+/// What the traffic lights do; the window decides how to close (it may ask to save).
+pub struct TrafficLightActions {
+    pub close: Box<dyn Fn(&mut Window, &mut App)>,
+}
+
+/// The close, minimize and zoom buttons, drawn as on macOS: colored circles that show
+/// their symbols when the pointer is over the group.
+pub fn traffic_lights(window: &Window, cx: &App, actions: TrafficLightActions) -> impl IntoElement {
+    let colors = theme::colors(cx);
+    let active = window.is_window_active();
+    let light = |id: &'static str, color: gpui::Hsla, glyph: &'static str| {
+        div()
+            .id(id)
+            .size(px(12.))
+            .rounded_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(if active { color } else { colors.traffic_inactive })
+            .border_1()
+            .border_color(alpha(gpui::black(), 0.12))
+            .child(
+                div()
+                    .invisible()
+                    .group_hover("traffic-lights", |s| s.visible())
+                    .child(icon_view(glyph, 9., alpha(gpui::black(), 0.6))),
+            )
+            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                window.prevent_default();
+                cx.stop_propagation();
+            })
+    };
+    let close = actions.close;
+    div()
+        .group("traffic-lights")
+        .flex()
+        .flex_none()
+        .items_center()
+        .gap(px(8.))
+        .child(light("close", colors.traffic_close, "x").on_click(move |_, window, cx| close(window, cx)))
+        .child(light("minimize", colors.traffic_minimize, "minus").on_click(|_, window, _| window.minimize_window()))
+        .child(light("zoom", colors.traffic_zoom, "plus").on_click(|_, window, _| window.zoom_window()))
 }
