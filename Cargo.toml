@@ -12,6 +12,7 @@ ignore = "0.4.34"
 image = { version = "0.25", default-features = false }
 notify = "8.2.2"
 parking_lot = "0.12.5"
+pulldown-cmark = { version = "0.13", default-features = false }
 regex = "1.13.1"
 ropey = { version = "1.6.1", default-features = false, features = ["cr_lines", "simd"] }
 serde = { version = "1.0.229", features = ["derive"] }

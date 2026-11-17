@@ -1,5 +1,10 @@
 //! Markdown, CSV and HTML files can switch between their source and a rendered preview.
 
+mod html;
+mod markdown;
+mod table;
+mod text;
+
 use std::path::Path;
 
 use crate::syntax::Language;
@@ -44,7 +49,7 @@ impl PreviewFormat {
 
 use std::path::Path as StdPath;
 
-use gpui::{AnyElement, Context, Entity, IntoElement, Window};
+use gpui::{AnyElement, Context, Entity, Window};
 
 use crate::editor::Editor;
 use crate::workspace::Workspace;
@@ -57,6 +62,12 @@ pub fn render(
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) -> AnyElement {
-    let _ = (path, editor, window);
-    crate::ui::unavailable("eye", format!("{} Preview", format.source_name()), "Coming soon.", None, cx).into_any_element()
+    let _ = window;
+    let source = editor.read(cx).text();
+    match format {
+        PreviewFormat::Markdown => markdown::render(&source, path, cx.entity().downgrade(), cx),
+        PreviewFormat::Csv => table::render(&source, false, cx),
+        PreviewFormat::Tsv => table::render(&source, true, cx),
+        PreviewFormat::Html => html::render(&source, path, cx.entity().downgrade(), cx),
+    }
 }
