@@ -2,8 +2,8 @@
 //! background and resizing from the edges.
 
 use gpui::{
-    AnyElement, App, Bounds, CursorStyle, Decorations, HitboxBehavior, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Pixels, Point, ResizeEdge, Size, StatefulInteractiveElement, Styled, Window,
+    AnyElement, App, Bounds, CursorStyle, Decorations, DispatchPhase, HitboxBehavior, InteractiveElement,
+    IntoElement, MouseButton, MouseDownEvent, ParentElement, ResizeEdge, StatefulInteractiveElement, Styled, Window,
     canvas, div, size, linear_color_stop, linear_gradient, point, prelude::FluentBuilder, px,
 };
 
@@ -15,6 +15,8 @@ use crate::ui::icon_view;
 pub const WINDOW_RADIUS: f32 = 16.;
 /// Room around the window for its shadow, where the edges can be grabbed to resize.
 const SHADOW: f32 = 12.;
+/// How far into the window, past its border, the edges can still be grabbed to resize.
+const GRAB_INSIDE: f32 = 5.;
 
 /// Wraps a window's content in the frame.
 pub fn frame(window: &mut Window, cx: &App, content: AnyElement) -> impl IntoElement {
@@ -41,46 +43,10 @@ pub fn frame(window: &mut Window, cx: &App, content: AnyElement) -> impl IntoEle
                 .id("window-backdrop")
                 .size_full()
                 .bg(gpui::transparent_black())
-                .child(
-                    // One hitbox per edge and corner, each with its own resize cursor, so the
-                    // cursor changes without redrawing the window on every mouse move.
-                    canvas(
-                        |bounds, window, _| {
-                            let edge = px(SHADOW);
-                            let corner = px(SHADOW * 2.);
-                            let (x, y) = (bounds.origin.x, bounds.origin.y);
-                            let (w, h) = (bounds.size.width, bounds.size.height);
-                            let rects = [
-                                (CursorStyle::ResizeUpLeftDownRight, Bounds::new(point(x, y), size(corner, corner))),
-                                (CursorStyle::ResizeUpRightDownLeft, Bounds::new(point(x + w - corner, y), size(corner, corner))),
-                                (CursorStyle::ResizeUpRightDownLeft, Bounds::new(point(x, y + h - corner), size(corner, corner))),
-                                (CursorStyle::ResizeUpLeftDownRight, Bounds::new(point(x + w - corner, y + h - corner), size(corner, corner))),
-                                (CursorStyle::ResizeUpDown, Bounds::new(point(x, y), size(w, edge))),
-                                (CursorStyle::ResizeUpDown, Bounds::new(point(x, y + h - edge), size(w, edge))),
-                                (CursorStyle::ResizeLeftRight, Bounds::new(point(x, y), size(edge, h))),
-                                (CursorStyle::ResizeLeftRight, Bounds::new(point(x + w - edge, y), size(edge, h))),
-                            ];
-                            rects.map(|(style, rect)| (style, window.insert_hitbox(rect, HitboxBehavior::Normal)))
-                        },
-                        |_, hitboxes, window, _| {
-                            for (style, hitbox) in &hitboxes {
-                                window.set_cursor_style(*style, hitbox);
-                            }
-                        },
-                    )
-                    .size_full()
-                    .absolute(),
-                )
                 .when(!tiling.top, |d| d.pt(px(inset)))
                 .when(!tiling.bottom, |d| d.pb(px(inset)))
                 .when(!tiling.left, |d| d.pl(px(inset)))
                 .when(!tiling.right, |d| d.pr(px(inset)))
-                .on_mouse_down(MouseButton::Left, move |e, window, _| {
-                    let size = window.window_bounds().get_bounds().size;
-                    if let Some(edge) = resize_edge(e.position, px(SHADOW), size) {
-                        window.start_window_resize(edge);
-                    }
-                })
                 .child(
                     div()
                         .id("window")
@@ -105,35 +71,71 @@ pub fn frame(window: &mut Window, cx: &App, content: AnyElement) -> impl IntoEle
                         .on_mouse_move(|_, _, cx| cx.stop_propagation())
                         .child(content),
                 )
+                .when(!tiling.is_tiled(), |d| d.child(resize_handles()))
                 .into_any_element()
         }
     }
 }
 
-fn resize_edge(pos: Point<Pixels>, inset: Pixels, size: Size<Pixels>) -> Option<ResizeEdge> {
-    let corner = inset * 2.;
-    let edge = if pos.y < inset && pos.x < corner || pos.x < inset && pos.y < corner {
-        ResizeEdge::TopLeft
-    } else if pos.y < inset && pos.x > size.width - corner || pos.x > size.width - inset && pos.y < corner {
-        ResizeEdge::TopRight
-    } else if pos.y < inset {
-        ResizeEdge::Top
-    } else if pos.y > size.height - inset && pos.x < corner || pos.x < inset && pos.y > size.height - corner {
-        ResizeEdge::BottomLeft
-    } else if pos.y > size.height - inset && pos.x > size.width - corner
-        || pos.x > size.width - inset && pos.y > size.height - corner
-    {
-        ResizeEdge::BottomRight
-    } else if pos.y > size.height - inset {
-        ResizeEdge::Bottom
-    } else if pos.x < inset {
-        ResizeEdge::Left
-    } else if pos.x > size.width - inset {
-        ResizeEdge::Right
-    } else {
-        return None;
-    };
-    Some(edge)
+/// The edges and corners that resize the window: the shadow around it and a few pixels
+/// of the window itself, so the visible border can be grabbed. Painted over the content,
+/// so those pixels resize rather than reaching what's beneath, with a larger grab at the
+/// rounded corners.
+fn resize_handles() -> impl IntoElement {
+    canvas(
+        |bounds, window, _| {
+            let edge = px(SHADOW + GRAB_INSIDE);
+            let corner = px(SHADOW + WINDOW_RADIUS + GRAB_INSIDE);
+            let (x, y) = (bounds.origin.x, bounds.origin.y);
+            let (w, h) = (bounds.size.width, bounds.size.height);
+            // Corners first: where they overlap an edge, the first hitbox wins.
+            let handles = [
+                (ResizeEdge::TopLeft, Bounds::new(point(x, y), size(corner, corner))),
+                (ResizeEdge::TopRight, Bounds::new(point(x + w - corner, y), size(corner, corner))),
+                (ResizeEdge::BottomLeft, Bounds::new(point(x, y + h - corner), size(corner, corner))),
+                (ResizeEdge::BottomRight, Bounds::new(point(x + w - corner, y + h - corner), size(corner, corner))),
+                (ResizeEdge::Top, Bounds::new(point(x, y), size(w, edge))),
+                (ResizeEdge::Bottom, Bounds::new(point(x, y + h - edge), size(w, edge))),
+                (ResizeEdge::Left, Bounds::new(point(x, y), size(edge, h))),
+                (ResizeEdge::Right, Bounds::new(point(x + w - edge, y), size(edge, h))),
+            ];
+            // Later hitboxes are in front, so insert in reverse to put the corners on top.
+            let mut hitboxes: Vec<_> = handles
+                .into_iter()
+                .rev()
+                .map(|(edge, rect)| (edge, window.insert_hitbox(rect, HitboxBehavior::BlockMouse)))
+                .collect();
+            hitboxes.reverse();
+            hitboxes
+        },
+        |_, hitboxes, window, _| {
+            for (edge, hitbox) in &hitboxes {
+                window.set_cursor_style(cursor_for(*edge), hitbox);
+            }
+            window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                if phase != DispatchPhase::Capture || event.button != MouseButton::Left {
+                    return;
+                }
+                if let Some((edge, _)) = hitboxes.iter().find(|(_, hitbox)| hitbox.is_hovered(window)) {
+                    window.start_window_resize(*edge);
+                    cx.stop_propagation();
+                }
+            });
+        },
+    )
+    .size_full()
+    .absolute()
+    .top_0()
+    .left_0()
+}
+
+fn cursor_for(edge: ResizeEdge) -> CursorStyle {
+    match edge {
+        ResizeEdge::TopLeft | ResizeEdge::BottomRight => CursorStyle::ResizeUpLeftDownRight,
+        ResizeEdge::TopRight | ResizeEdge::BottomLeft => CursorStyle::ResizeUpRightDownLeft,
+        ResizeEdge::Top | ResizeEdge::Bottom => CursorStyle::ResizeUpDown,
+        ResizeEdge::Left | ResizeEdge::Right => CursorStyle::ResizeLeftRight,
+    }
 }
 
 /// Makes an element drag the window, double-click to maximize, and right-click for
